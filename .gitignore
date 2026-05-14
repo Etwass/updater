@@ -1,6 +1,7 @@
+#CMake
 CMakeLists.txt.user
 CMakeCache.txt
-CMakeFiles
+CMakeFiles/
 CMakeScripts
 Testing
 Makefile
@@ -10,6 +11,25 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 CMakeUserPresets.json
+
+# Build directories
+/build/
+/out/
+/bin/
+/obj/
+
+# Visual Studio
+*.sln
+*.vcxproj*
+*.user
+*.opensdf
+*.sdf
+*.cachefile
+*.db
+
+# Logs
+*.log
+*.tmp
 
 # CLion
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
