@@ -19,6 +19,7 @@ CMakeUserPresets.json
 /obj/
 
 # Visual Studio
+.vs/
 *.sln
 *.vcxproj*
 *.user
