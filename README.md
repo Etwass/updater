@@ -16,7 +16,7 @@
 Вы можете использовать, изменять и распространять программу, но любые производные работы должны оставаться открытыми и содержать указание авторства.
 
 ### Автор
-Проект создан **Дмитрием**.  
+Проект создан **Дмитрием Читанава**.  
 Если вы используете этот код или встраиваете его в свои решения, пожалуйста, сохраняйте указание автора.
 
 ---
@@ -39,7 +39,7 @@ Dieses Projekt wird unter der **GNU GPLv3**‑Lizenz veröffentlicht.
 Sie dürfen das Programm verwenden, ändern und weitergeben, aber alle abgeleiteten Werke müssen offen bleiben und eine korrekte Urheberangabe enthalten.
 
 ### Autor
-Erstellt von **Dmitriy**.  
+Erstellt von **Dmitri Chitanava**.  
 Wenn Sie diesen Code verwenden oder in Ihre Lösungen integrieren, geben Sie bitte den ursprünglichen Autor an.
 
 ---
@@ -62,5 +62,5 @@ This project is distributed under the **GNU GPLv3** license.
 You may use, modify, and redistribute the program, but any derivative works must remain open and include proper attribution.
 
 ### Author
-Created by **Dmitriy**.  
+Created by **Dmitri Chitanava**.  
 If you use this code or integrate it into your solutions, please keep the author attribution.
