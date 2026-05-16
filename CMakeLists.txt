@@ -11,10 +11,14 @@ set(CMAKE_TOOLCHAIN_FILE "C:/vcpkg/scripts/buildsystems/vcpkg.cmake")
 add_executable(Updater
     src/main.cpp
     src/updater.cpp
-#    src/updater.h
+    src/updater.h
+    src/interfaces/network_operation.h
+    src/net/curl_connection.h
+    src/net/curl_connection.cpp
+    src/net/connection_config.h
 #    src/ftp_client.cpp
 #    src/ftp_client.h
-)
+ "src/updater.h" "src/interfaces/network_operation.h" "src/net/connection_config.h" "src/net/curl_connection.cpp")
 
 # Находим cURL
 find_package(CURL CONFIG REQUIRED)
