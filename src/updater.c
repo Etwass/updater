@@ -27,7 +27,29 @@ int net_init(NET_HANDLE handle)
       return (((CURL_DATA *)handle)->curl = curl_easy_init()) ? NET_OK : NET_ERROR;
     return NET_ERROR;
   }
-int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_WRITE_CALLBACK fn_write, void *stream)
+int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_WRITE_CALLBACK fn_callback, void *data)
+  {
+    if(handle && config && fn_callback)
+      {
+        CURL_DATA *curl_handle = (CURL_DATA *)handle;
+        curl_easy_setopt(curl_handle->curl, CURLOPT_URL, config->url);
+        curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, 0L);
+        if(config->username && config->password)
+          {
+            size_t userpwd_len = strlen(config->username) + strlen(config->password) + 2; // +2 for ':' and null terminator
+            char *userpwd = malloc(userpwd_len);
+
+            snprintf(userpwd, userpwd_len, "%s:%s", config->username, config->password);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_USERPWD, userpwd);
+            free(userpwd);
+          }
+        curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_callback);
+        if(data)curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, data);
+        return (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+      }
+    return NET_ERROR;
+  }
+int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_PROGRESS fn_progress, NET_FN_WRITE_CALLBACK fn_write, void *stream)
   {
     if(handle && config && fn_write)
       {
@@ -42,6 +64,12 @@ int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_WRIT
             snprintf(userpwd, userpwd_len, "%s:%s", config->username, config->password);
             curl_easy_setopt(curl_handle->curl, CURLOPT_USERPWD, userpwd);
             free(userpwd);
+          }
+        if(fn_progress)
+          {
+            curl_easy_setopt(curl_handle->curl, CURLOPT_NOPROGRESS, 0L);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_XFERINFOFUNCTION, (curl_progress_callback)fn_progress);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_XFERINFODATA, NULL);
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_write);
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, stream);
