@@ -27,44 +27,64 @@ int net_init(NET_HANDLE handle)
       return (((CURL_DATA *)handle)->curl = curl_easy_init()) ? NET_OK : NET_ERROR;
     return NET_ERROR;
   }
-int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_WRITE_CALLBACK fn_callback, void *data)
+int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRITE_CALLBACK fn_callback, void *data)
   {
-    if(handle && config && fn_callback)
+    if(handle && cfg && fn_callback)
       {
+        int result = 0;
+        size_t url_len = strlen(cfg->url);
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
-        curl_easy_setopt(curl_handle->curl, CURLOPT_URL, config->url);
-        curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, 0L);
-        if(config->username && config->password)
-          {
-            size_t userpwd_len = strlen(config->username) + strlen(config->password) + 2; // +2 for ':' and null terminator
-            char *userpwd = malloc(userpwd_len);
+        const char *good_url = 0;
 
-            snprintf(userpwd, userpwd_len, "%s:%s", config->username, config->password);
-            curl_easy_setopt(curl_handle->curl, CURLOPT_USERPWD, userpwd);
-            free(userpwd);
+        if(*(cfg->url + url_len - 1) != '/')
+          {
+            good_url = malloc(url_len + 2);
+
+            if(!good_url)
+              {
+                fprintf(stderr, "malloc() failed\n");
+                return NET_ERROR;
+              }
+            sprintf(good_url, "%s%s", cfg->url, (*(cfg->url + url_len - 1) != '/' ? "/" : ""));
           }
+        curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (good_url ? good_url : cfg->url));
+        curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, cfg->listing_only);
+        if(cfg->user)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
+        if(cfg->password)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_callback);
         if(data)curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, data);
-        return (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+        result = (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+        if(good_url)
+          free(good_url);
+        return result;
       }
     return NET_ERROR;
   }
-int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_PROGRESS fn_progress, NET_FN_WRITE_CALLBACK fn_write, void *stream)
+int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_PROGRESS fn_progress, NET_FN_WRITE_CALLBACK fn_write, void *stream)
   {
-    if(handle && config && fn_write)
+    if(handle && cfg && fn_write)
       {
+        int result = 0;
+        char *url_with_filename = 0;
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
 
-        curl_easy_setopt(curl_handle->curl, CURLOPT_URL, config->url);
-        if(config->username && config->password)
+        if(cfg->filename)
           {
-            size_t userpwd_len = strlen(config->username) + strlen(config->password) + 2; // +2 for ':' and null terminator
-            char *userpwd = malloc(userpwd_len);
-
-            snprintf(userpwd, userpwd_len, "%s:%s", config->username, config->password);
-            curl_easy_setopt(curl_handle->curl, CURLOPT_USERPWD, userpwd);
-            free(userpwd);
+            url_with_filename = malloc(strlen(cfg->url) + strlen(cfg->filename) + 1 + 1);
+            if(!url_with_filename)
+              {
+                fprintf(stderr, "malloc() failed\n");
+                return NET_ERROR;
+              }
+            sprintf(url_with_filename, "%s%s%s", cfg->url, (*(cfg->url + strlen(cfg->url) - 1) != '/'?"/":""), cfg->filename);
           }
+        curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (url_with_filename? url_with_filename : cfg->url));
+        if(cfg->user)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
+        if(cfg->password)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
         if(fn_progress)
           {
             curl_easy_setopt(curl_handle->curl, CURLOPT_NOPROGRESS, 0L);
@@ -73,7 +93,10 @@ int net_download(NET_HANDLE handle, const CONNECTION_CONFIG *config, NET_FN_PROG
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_write);
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, stream);
-        return (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+        result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+        if(url_with_filename)
+          free(url_with_filename);
+        return result;
       }
     return NET_ERROR;
   }

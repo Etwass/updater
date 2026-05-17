@@ -13,9 +13,12 @@ typedef int (*NET_FN_PROGRESS)(void *, net_off_t, net_off_t, net_off_t, net_off_
 typedef struct tagCONNECTION_CONFIG
   {
     const char *url;
-    const char *username;
+    const char *user;
     const char *password;
     unsigned int port;
+    const char *filename;
+    int progress;
+    long int listing_only;
   } CONNECTION_CONFIG;
 
 typedef struct tagLISTING_BUFFER
