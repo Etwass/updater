@@ -25,7 +25,6 @@
 //  "--help"
 //]
 
-
 void show_usage(const char *);
 
 int progress_callback(void *, net_off_t, net_off_t, net_off_t, net_off_t);
