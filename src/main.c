@@ -120,7 +120,7 @@ int progress_callback(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off
 
     if(!start_time)
       start_time = time(NULL);
-    if((current_time = time(NULL)) - start_time < 1)return 0;
+    if((current_time = time(NULL)) - start_time < 1 && dlnow < dltotal)return 0;
     if(dltotal > 0)
       {
         double progress = (double)dlnow / dltotal * 100.0;
