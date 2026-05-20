@@ -36,7 +36,7 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
         int result = 0;
         size_t url_len = strlen(cfg->url);
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
-        const char *good_url = 0;
+        char *good_url = 0;
 
         if(*(cfg->url + url_len - 1) != '/')
           {
