@@ -9,7 +9,7 @@
 
 //"args": [
 //  "--url",
-//  "ftp://ftp.scene.org/",
+//  "ftp://ftp.scene.org/",// pub/music/disks/xmasmsx.zip"
 //  "--user",
 //  "ftp-93129.cloudx",
 //  "--password",
@@ -17,7 +17,7 @@
 //  "--port",
 //  "1500",
 //  "--filename",
-//  "welcome.msg",
+//  "xmasmsx.zip",
 //  "--progress",
 //  "on",
 //  "--listing",
@@ -29,9 +29,10 @@
 
 void show_usage(const char *);
 
-int progress_callback(void *, net_off_t, net_off_t, net_off_t, net_off_t);
-size_t write_callback(void *, size_t, size_t, void *);
-size_t write_data(void *, size_t, size_t, FILE *);
+int cb_progress(void *, net_off_t, net_off_t, net_off_t, net_off_t);
+size_t cb_listing(void *, size_t, size_t, void *);
+size_t cd_write(void *, size_t, size_t, FILE *);
+int cb_cant_download_resume(void *);
 
 const char *get_program_name(const char *path);
 int get_listing(NET_HANDLE,const CONNECTION_CONFIG *);
@@ -123,7 +124,7 @@ void show_usage(const char *prog_name)
       );
   }
 
-int progress_callback(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off_t ultotal, net_off_t ulnow)
+int cb_progress(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off_t ultotal, net_off_t ulnow)
   {
 #define TIME_INTERVAL 1
     static time_t start_time = 0;
@@ -142,8 +143,7 @@ int progress_callback(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off
     return 0;
 #undef TIME_INTERVAL
   }
-
-size_t write_callback(void *ptr, size_t size, size_t nmemb, void *data)
+size_t cb_listing(void *ptr, size_t size, size_t nmemb, void *data)
   {
 #define BLOCK_SIZE      1024
     size_t extra_size = size * nmemb;
@@ -162,14 +162,23 @@ size_t write_callback(void *ptr, size_t size, size_t nmemb, void *data)
     return extra_size;
 #undef BLOCK_SIZE
   }
-
-size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *file)
+size_t cd_write(void *ptr, size_t size, size_t nmemb, FILE *file)
   {
     size_t res = fwrite(ptr, size, nmemb, file);
 
     if(ferror(file))
       perror("Write error");
     return res;
+  }
+int cb_cant_download_resume(void *stream)
+  {
+    fprintf(stderr, "Server does not support resuming downloads. Restarting from the beginning.\n");
+    if(freopen(NULL, "wb", (FILE *)stream) == NULL)
+      {
+        fprintf(stderr, "Failed to reopen file for writing\nSkip downloading...\n");
+        return 1;
+      }
+    return 0;
   }
 
 const char *get_program_name(const char *path)
@@ -190,7 +199,7 @@ int get_listing(NET_HANDLE net_handle,const CONNECTION_CONFIG *cfg)
         fprintf(stderr, "Failed to initialize network handle\n");
         return 1;
       }
-    net_get_listing(net_handle, cfg, write_callback, &listing);
+    net_get_listing(net_handle, cfg, cb_listing, &listing);
     net_cleanup(net_handle);
     printf("Directory listing:\n\n%s\n", listing.data);
     if(listing.data)free(listing.data);
@@ -213,7 +222,7 @@ int download_file(const char *dest_filename, NET_HANDLE net_handle, const CONNEC
         return 1;
       }
     sprintf((char *)temp_filename, "%s%s", dest_filename, TEMP_FILE_EXTENSION);
-    if(!(file = fopen(temp_filename, "wb")))
+    if(!(file = fopen(temp_filename, "ab")))
       {
         fprintf(stderr, "Failed to open file for writing\n");
         return 1;
@@ -223,7 +232,8 @@ int download_file(const char *dest_filename, NET_HANDLE net_handle, const CONNEC
         fprintf(stderr, "Failed to initialize network handle\n");
         return 1;
       }
-    if(net_download(net_handle, cfg, (NET_FN_PROGRESS)(cfg->progress?progress_callback:NULL), (NET_FN_WRITE_CALLBACK)write_data, file) != NET_OK)
+    fseek(file, 0, SEEK_END);
+    if(net_download(net_handle,ftell(file), cfg, (NET_FN_CANT_DOWNLOAD_RESUME)cb_cant_download_resume, (NET_FN_PROGRESS)(cfg->progress ? cb_progress : NULL), (NET_FN_WRITE)cd_write, file) != NET_OK)
       {
         fprintf(stderr, "Failed to download file\n");
         result = 1;
