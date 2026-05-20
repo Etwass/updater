@@ -25,14 +25,19 @@
 //  "--help"
 //]
 
+#define TEMP_FILE_EXTENSION ".tmp"
+
 void show_usage(const char *);
 
 int progress_callback(void *, net_off_t, net_off_t, net_off_t, net_off_t);
 size_t write_callback(void *, size_t, size_t, void *);
 size_t write_data(void *, size_t, size_t, FILE *);
 
+const char *get_program_name(const char *path);
 int get_listing(NET_HANDLE,const CONNECTION_CONFIG *);
+
 int download_file(const char *, NET_HANDLE,const CONNECTION_CONFIG *);
+
 
 int main(int argc, char *argv[])
   {
@@ -45,14 +50,14 @@ int main(int argc, char *argv[])
 
     if(argc == 1)
       {
-        show_usage(argv[0]);
+        show_usage(get_program_name(argv[0]));
         return 0;
       }
     for(int i = 1; i < argc; i++)
       {
         if(strcmp(argv[i], "--help") == 0)
           {
-            show_usage(argv[0]);
+            show_usage(get_program_name(argv[0]));
             return 0;
           }
         if(strcmp(argv[i], "--url") == 0)
@@ -75,6 +80,12 @@ int main(int argc, char *argv[])
                         config.listing_only = strcmp(argv[++i], "full") == 0 ? 0 : 1;
                         task_flags |= TASK_FLAG_LISTING;
                       }
+                      else
+                        {
+                          printf("Unknown option: %s\n", argv[i]);
+                          show_usage(get_program_name(argv[0]));
+                          return 1;
+                        }
       }
     if(task_flags == (TASK_FLAG_DOWNLOAD | TASK_FLAG_LISTING))
       {
@@ -161,6 +172,15 @@ size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *file)
     return res;
   }
 
+const char *get_program_name(const char *path)
+  {
+    const char *last_slash = strrchr(path, '/');
+    const char *last_backslash = strrchr(path, '\\');
+    const char *last_separator = (last_slash > last_backslash) ? last_slash : last_backslash;
+
+    return last_separator ? last_separator + 1 : path;
+  }
+
 int get_listing(NET_HANDLE net_handle,const CONNECTION_CONFIG *cfg)
   {
     LISTING_BUFFER listing = {.size = 0, .capacity = 0,.data = NULL};
@@ -176,12 +196,24 @@ int get_listing(NET_HANDLE net_handle,const CONNECTION_CONFIG *cfg)
     if(listing.data)free(listing.data);
     return 0;
   }
-int download_file(const char *filename, NET_HANDLE net_handle, const CONNECTION_CONFIG *cfg)
+int download_file(const char *dest_filename, NET_HANDLE net_handle, const CONNECTION_CONFIG *cfg)
   {
+    if(!dest_filename)
+      {
+        fprintf(stderr, "No filename specified for download\n");
+        return 1;
+      }
+    FILE *file;
     int result = 0;
-    FILE *file = fopen(filename, "wb");
+    const char *temp_filename = malloc(strlen(dest_filename) + strlen(TEMP_FILE_EXTENSION) + 1);
 
-    if(!file)
+    if(!temp_filename)
+      {
+        fprintf(stderr, "malloc() failed\n");
+        return 1;
+      }
+    sprintf((char *)temp_filename, "%s%s", dest_filename, TEMP_FILE_EXTENSION);
+    if(!(file = fopen(temp_filename, "wb")))
       {
         fprintf(stderr, "Failed to open file for writing\n");
         return 1;
@@ -198,5 +230,11 @@ int download_file(const char *filename, NET_HANDLE net_handle, const CONNECTION_
       }
     net_cleanup(net_handle);
     fclose(file);
+    if(rename(dest_filename, temp_filename) != 0)
+      {
+        remove(dest_filename);
+        if((result = rename(temp_filename, dest_filename)) != 0)
+          fprintf(stderr, "Failed to rename temporary file\n");
+      }
     return result;
   }
