@@ -50,6 +50,8 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
             sprintf(good_url, "%s%s", cfg->url, (*(cfg->url + url_len - 1) != '/' ? "/" : ""));
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (good_url ? good_url : cfg->url));
+        if(cfg->port)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_PORT, cfg->port);
         curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, cfg->listing_only);
         if(cfg->user)
           curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
@@ -83,6 +85,8 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
             sprintf(url_with_filename, "%s%s%s", cfg->url, (*(cfg->url + strlen(cfg->url) - 1) != '/'?"/":""), cfg->filename);
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (url_with_filename? url_with_filename : cfg->url));
+        if(cfg->port)
+          curl_easy_setopt(curl_handle->curl, CURLOPT_PORT, cfg->port);
         if(cfg->user)
           curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
         if(cfg->password)
