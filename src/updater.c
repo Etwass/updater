@@ -73,6 +73,7 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
         int result = NET_OK;
         char *url_with_filename = 0;
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
+        PROGRESS_DATA progress_data = {.downloaded = offset};
 
         if(cfg->filename)
           {
@@ -108,7 +109,7 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
           {
             curl_easy_setopt(curl_handle->curl, CURLOPT_NOPROGRESS, 0L);
             curl_easy_setopt(curl_handle->curl, CURLOPT_XFERINFOFUNCTION, (curl_progress_callback)fn_progress);
-            curl_easy_setopt(curl_handle->curl, CURLOPT_XFERINFODATA, NULL);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_XFERINFODATA, &progress_data);
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_write);
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, stream);

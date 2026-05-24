@@ -128,6 +128,7 @@ int cb_progress(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off_t ult
   {
 #define TIME_INTERVAL 1
     static time_t start_time = 0;
+    PROGRESS_DATA *pb = (PROGRESS_DATA *)clientp;
     int current_time;
 
     if(!start_time)
@@ -135,9 +136,9 @@ int cb_progress(void *clientp, net_off_t dltotal, net_off_t dlnow, net_off_t ult
     if((current_time = time(NULL)) - start_time < 1 && dlnow < dltotal)return 0;
     if(dltotal > 0)
       {
-        double progress = (double)dlnow / dltotal * 100.0;
+        double progress = (double)(dlnow + pb->downloaded) / (dltotal + pb->downloaded) * 100.0;
 
-        printf("\rDownload: %.2f%% (%lld/%lld bite)", progress, dlnow, dltotal);
+        printf("\rDownload: %.2f%% (%lld/%lld bite)", progress, dlnow + pb->downloaded, dltotal + pb->downloaded);
       }
     start_time = current_time;
     return 0;

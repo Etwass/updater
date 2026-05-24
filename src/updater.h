@@ -29,6 +29,13 @@ typedef struct tagLISTING_BUFFER
     char *data;
   } LISTING_BUFFER;
 
+typedef struct tafPROGRESS_DATA
+  {
+//    net_off_t total;
+    net_off_t downloaded;
+//    time_t last_update_time;
+  } PROGRESS_DATA;
+
 NET_HANDLE net_create();
 int net_init(NET_HANDLE);
 int net_get_listing(NET_HANDLE, const CONNECTION_CONFIG *, NET_FN_WRITE, void *);
