@@ -1,8 +1,8 @@
 #pragma once
 #include <curl/system.h>
 
-#define NET_OK 0
-#define NET_ERROR -1
+#define NET_OK        0
+#define NET_ERROR     -1
 
 typedef void *NET_HANDLE;
 typedef curl_off_t net_off_t;

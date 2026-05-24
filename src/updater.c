@@ -3,6 +3,9 @@
 #include <curl/curl.h>
 #include <malloc.h>
 
+#define NET_LOGIN     "anonymous"
+#define NET_PASSWORD  NET_LOGIN"@"NET_LOGIN".com"
+
 typedef struct tagCURL_DATA
   {
     CURL *curl;
@@ -47,19 +50,29 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
                 fprintf(stderr, "malloc() failed\n");
                 return NET_ERROR;
               }
-            sprintf(good_url, "%s%s", cfg->url, (*(cfg->url + url_len - 1) != '/' ? "/" : ""));
+            sprintf(good_url, "%s/", cfg->url);
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (good_url ? good_url : cfg->url));
         if(cfg->port)
           curl_easy_setopt(curl_handle->curl, CURLOPT_PORT, cfg->port);
         curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, cfg->listing_only);
-        if(cfg->user)
-          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
-        if(cfg->password)
-          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
+//        if(cfg->user)
+//          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
+//        if(cfg->password)
+//          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
+        curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, (cfg->user ? cfg->user : NET_LOGIN));
+        curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, (cfg->password ? cfg->password : NET_PASSWORD));
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_callback);
         if(data)curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, data);
-        result = (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+        //result = (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
+        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR) != NET_OK)
+          {
+            curl_easy_setopt(curl_handle->curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
+            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+          }
         if(good_url)
           free(good_url);
         return result;
@@ -88,10 +101,8 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
         curl_easy_setopt(curl_handle->curl, CURLOPT_URL, (url_with_filename? url_with_filename : cfg->url));
         if(cfg->port)
           curl_easy_setopt(curl_handle->curl, CURLOPT_PORT, cfg->port);
-        if(cfg->user)
-          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
-        if(cfg->password)
-          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
+        curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, (cfg->user ? cfg->user : NET_LOGIN));
+        curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, (cfg->password ? cfg->password : NET_PASSWORD));
         if(offset > 0)
           {
             if(ftp_supports_resume(curl_handle->curl, url_with_filename) != NET_OK)
@@ -113,7 +124,19 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
           }
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_write);
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, stream);
-        result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+        curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_USE_EPSV, 0L);
+        //curl_easy_setopt(curl_handle->curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+        //curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
+        //curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        //curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
+        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR) != NET_OK)
+          {
+            curl_easy_setopt(curl_handle->curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
+            curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
+            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+          }
 NET_DWNL_EXIT:
         if(url_with_filename)
           free(url_with_filename);

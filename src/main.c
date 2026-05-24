@@ -9,7 +9,7 @@
 
 //"args": [
 //  "--url",
-//  "ftp://ftp.scene.org/",// pub/music/disks/xmasmsx.zip"
+//  "ftp://ftp.rssd.esa.int/GAIA_PUBLIC_DATA/GaiaScanningLaw/",
 //  "--user",
 //  "ftp-93129.cloudx",
 //  "--password",
@@ -17,7 +17,7 @@
 //  "--port",
 //  "1500",
 //  "--filename",
-//  "xmasmsx.zip",
+//  "FullGaiaMissionScanningLaw.zip",
 //  "--progress",
 //  "on",
 //  "--listing",
