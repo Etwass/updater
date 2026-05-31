@@ -3,8 +3,21 @@
 #include <curl/curl.h>
 #include <malloc.h>
 
-#define NET_LOGIN     "anonymous"
-#define NET_PASSWORD  NET_LOGIN"@"NET_LOGIN".com"
+#define NET_LOGIN             "anonymous"
+#define NET_PASSWORD          NET_LOGIN"@"NET_LOGIN".com"
+
+#define PROTOCOL_FTP          "ftp://"
+#define PROTOCOL_FTPS         "ftps://"
+#define PROTOCOL_SFTP         "sftp://"
+#define PROTOCOL_HTTP         "http://"
+#define PROTOCOL_HTTPS        "https://"
+
+#define PROTOCOL_FTP_UNKNOWN  -1
+#define PROTOCOL_FTP_CODE     0
+#define PROTOCOL_FTPS_CODE    1
+#define PROTOCOL_SFTP_CODE    2
+#define PROTOCOL_HTTP_CODE    3
+#define PROTOCOL_HTTPS_CODE   4
 
 typedef struct tagCURL_DATA
   {
@@ -12,6 +25,8 @@ typedef struct tagCURL_DATA
     CONNECTION_CONFIG config;
   } CURL_DATA;
 
+int determine_protocol(const char *);
+int tune_curl_for_protocol(CURL *, int);
 int ftp_supports_resume(CURL *, const char *);
 
 NET_HANDLE net_create()
@@ -165,6 +180,37 @@ void net_destroy(NET_HANDLE handle)
       }
    }
 
+int determine_protocol(const char *url)
+  {
+    if(strncmp(url, PROTOCOL_FTP, strlen(PROTOCOL_FTP)) == 0)
+      return PROTOCOL_FTP_CODE;
+    else if(strncmp(url, PROTOCOL_FTPS, strlen(PROTOCOL_FTPS)) == 0)
+      return PROTOCOL_FTPS_CODE;
+    else if(strncmp(url, PROTOCOL_SFTP, strlen(PROTOCOL_SFTP)) == 0)
+      return PROTOCOL_SFTP_CODE;
+    else if(strncmp(url, PROTOCOL_HTTP, strlen(PROTOCOL_HTTP)) == 0)
+      return PROTOCOL_HTTP_CODE;
+    else if(strncmp(url, PROTOCOL_HTTPS, strlen(PROTOCOL_HTTPS)) == 0)
+      return PROTOCOL_HTTPS_CODE;
+    return PROTOCOL_FTP_UNKNOWN;
+  }
+int tune_curl_for_protocol(CURL *curl, int code)
+  {
+    switch(code)
+      {
+        case PROTOCOL_FTP_CODE:
+          curl_easy_setopt(curl, CURLOPT_FTP_USE_EPSV, 0L);
+          break;
+        case PROTOCOL_FTPS_CODE:
+          curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+          curl_easy_setopt(curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
+          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+          break;
+        case PROTOCOL_SFTP_CODE:
+          
+      }
+  }
 int ftp_supports_resume(CURL *curl, const char *url)
   {
     curl_easy_setopt(curl, CURLOPT_URL, url);
