@@ -56,6 +56,11 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
         char *good_url = 0;
 
+        if(tune_curl_for_protocol(curl_handle->curl, determine_protocol(cfg->url)) != NET_OK)
+          {
+            fprintf(stderr, "Unsupported protocol in URL: %s\n", cfg->url);
+            return NET_ERROR;
+          }
         if(*(cfg->url + url_len - 1) != '/')
           {
             good_url = malloc(url_len + 2);
@@ -208,7 +213,7 @@ int tune_curl_for_protocol(CURL *curl, int code)
           curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
           break;
         case PROTOCOL_SFTP_CODE:
-          
+          ;
       }
   }
 int ftp_supports_resume(CURL *curl, const char *url)
