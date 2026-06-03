@@ -9,7 +9,7 @@
 
 //"args": [
 //  "--url",
-//  "ftp://ftp.rssd.esa.int/GAIA_PUBLIC_DATA/GaiaScanningLaw/",
+//  " ftp://ftp.rssd.esa.int/HIPPARCOS_PUBLIC_DATA/",
 //  "--user",
 //  "ftp-93129.cloudx",
 //  "--password",
@@ -17,7 +17,7 @@
 //  "--port",
 //  "1500",
 //  "--filename",
-//  "FullGaiaMissionScanningLaw.zip",
+//  "Hip1-CDROMs-Volume17.zip",
 //  "--progress",
 //  "on",
 //  "--listing",

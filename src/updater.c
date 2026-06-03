@@ -19,6 +19,9 @@
 #define PROTOCOL_HTTP_CODE    3
 #define PROTOCOL_HTTPS_CODE   4
 
+#define LISTING               1
+#define DOWNLOAD              (!LISTING)
+
 typedef struct tagCURL_DATA
   {
     CURL *curl;
@@ -26,7 +29,7 @@ typedef struct tagCURL_DATA
   } CURL_DATA;
 
 int determine_protocol(const char *);
-int tune_curl_for_protocol(CURL *, int);
+int tune_curl_for_protocol(CURL *, int, const CONNECTION_CONFIG *, curl_off_t, int);
 int ftp_supports_resume(CURL *, const char *);
 
 NET_HANDLE net_create()
@@ -44,8 +47,8 @@ NET_HANDLE net_create()
 int net_init(NET_HANDLE handle)
   {
     if(handle)
-      return (((CURL_DATA *)handle)->curl = curl_easy_init()) ? NET_OK : NET_ERROR;
-    return NET_ERROR;
+      return (((CURL_DATA *)handle)->curl = curl_easy_init()) ? NET_OK : NET_UNKNOWN_ERROR;
+    return NET_UNKNOWN_ERROR;
   }
 int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRITE fn_callback, void *data)
   {
@@ -56,10 +59,15 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
         char *good_url = 0;
 
-        if(tune_curl_for_protocol(curl_handle->curl, determine_protocol(cfg->url)) != NET_OK)
+        if(tune_curl_for_protocol(curl_handle->curl, determine_protocol(cfg->url), cfg, 0, LISTING) != NET_OK)
           {
-            fprintf(stderr, "Unsupported protocol in URL: %s\n", cfg->url);
-            return NET_ERROR;
+            if(0)
+              {
+                fprintf(stderr, "Unsupported protocol in URL: %s\n", cfg->url);
+                return NET_UNKNOWN_ERROR;
+              }
+            printf("Warning: Unsupported protocol in URL: %s\nProceeding with default settings...\n", cfg->url);
+            tune_curl_for_protocol(curl_handle->curl, PROTOCOL_FTP_CODE, cfg, 0, LISTING);
           }
         if(*(cfg->url + url_len - 1) != '/')
           {
@@ -68,7 +76,7 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
             if(!good_url)
               {
                 fprintf(stderr, "malloc() failed\n");
-                return NET_ERROR;
+                return NET_UNKNOWN_ERROR;
               }
             sprintf(good_url, "%s/", cfg->url);
           }
@@ -76,28 +84,24 @@ int net_get_listing(NET_HANDLE handle, const CONNECTION_CONFIG *cfg, NET_FN_WRIT
         if(cfg->port)
           curl_easy_setopt(curl_handle->curl, CURLOPT_PORT, cfg->port);
         curl_easy_setopt(curl_handle->curl, CURLOPT_DIRLISTONLY, cfg->listing_only);
-//        if(cfg->user)
-//          curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, cfg->user);
-//        if(cfg->password)
-//          curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, cfg->password);
         curl_easy_setopt(curl_handle->curl, CURLOPT_USERNAME, (cfg->user ? cfg->user : NET_LOGIN));
         curl_easy_setopt(curl_handle->curl, CURLOPT_PASSWORD, (cfg->password ? cfg->password : NET_PASSWORD));
         curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEFUNCTION, fn_callback);
         if(data)curl_easy_setopt(curl_handle->curl, CURLOPT_WRITEDATA, data);
         //result = (curl_easy_perform(curl_handle->curl) == CURLE_OK) ? NET_OK : NET_ERROR;
-        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR) != NET_OK)
+        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_UNKNOWN_ERROR) != NET_OK)
           {
             curl_easy_setopt(curl_handle->curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
             curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
             curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
             curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
-            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_UNKNOWN_ERROR;
           }
         if(good_url)
           free(good_url);
         return result;
       }
-    return NET_ERROR;
+    return NET_UNKNOWN_ERROR;
   }
 int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cfg, NET_FN_CANT_DOWNLOAD_RESUME fn_cant_download_resume, NET_FN_PROGRESS fn_progress, NET_FN_WRITE fn_write, void *stream)
   {
@@ -108,13 +112,23 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
         CURL_DATA *curl_handle = (CURL_DATA *)handle;
         PROGRESS_DATA progress_data = {.downloaded = offset};
 
+        if(tune_curl_for_protocol(curl_handle->curl, determine_protocol(cfg->url), cfg, 0, LISTING) != NET_OK)
+          {
+            if(0)
+              {
+                fprintf(stderr, "Unsupported protocol in URL: %s\n", cfg->url);
+                return NET_UNKNOWN_ERROR;
+              }
+            printf("Warning: Unsupported protocol in URL: %s\nProceeding with default settings...\n", cfg->url);
+            tune_curl_for_protocol(curl_handle->curl, PROTOCOL_FTP_CODE, cfg, 0, LISTING);
+          }
         if(cfg->filename)
           {
             url_with_filename = malloc(strlen(cfg->url) + strlen(cfg->filename) + 1 + 1);
             if(!url_with_filename)
               {
                 fprintf(stderr, "malloc() failed\n");
-                return NET_ERROR;
+                return NET_UNKNOWN_ERROR;
               }
             sprintf(url_with_filename, "%s%s%s", cfg->url, (*(cfg->url + strlen(cfg->url) - 1) != '/'?"/":""), cfg->filename);
           }
@@ -129,7 +143,7 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
               {
                 if(fn_cant_download_resume && fn_cant_download_resume(stream))
                   {
-                    result = NET_ERROR;
+                    result = NET_UNKNOWN_ERROR;
                     goto NET_DWNL_EXIT;
                   }
               }
@@ -149,20 +163,20 @@ int net_download(NET_HANDLE handle, long int offset, const CONNECTION_CONFIG *cf
         //curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
         //curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
         //curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
-        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR) != NET_OK)
+        if((result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_UNKNOWN_ERROR) != NET_OK)
           {
             curl_easy_setopt(curl_handle->curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
             curl_easy_setopt(curl_handle->curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
             curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYPEER, 0L);
             curl_easy_setopt(curl_handle->curl, CURLOPT_SSL_VERIFYHOST, 0L);
-            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_ERROR;
+            result = curl_easy_perform(curl_handle->curl) == CURLE_OK ? NET_OK : NET_UNKNOWN_ERROR;
           }
 NET_DWNL_EXIT:
         if(url_with_filename)
           free(url_with_filename);
         return result;
       }
-    return NET_ERROR;
+    return NET_UNKNOWN_ERROR;
   }
 void net_cleanup(NET_HANDLE handle)
   {
@@ -199,22 +213,144 @@ int determine_protocol(const char *url)
       return PROTOCOL_HTTPS_CODE;
     return PROTOCOL_FTP_UNKNOWN;
   }
-int tune_curl_for_protocol(CURL *curl, int code)
+
+void setup_curl_for_ftp(CURL *curl)
   {
-    switch(code)
+    /* FTP — без шифрования */
+    curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_NONE);
+
+    /* Пассивный режим (рекомендуется) */
+    curl_easy_setopt(curl, CURLOPT_FTP_USE_EPSV, 1L);
+
+    /* Активный режим (если нужно) */
+    /* curl_easy_setopt(curl, CURLOPT_FTPPORT, "-"); */
+
+    /* LIST/NLST */
+    /* Управляется через CURLOPT_DIRLISTONLY в вызывающем коде */
+
+    /* Докачка */
+    /* Устанавливается через CURLOPT_RESUME_FROM_LARGE */
+
+    /* Тип передачи (ASCII/BINARY) */
+    curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0L);  // бинарный режим
+
+    /* Таймауты */
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);       // без ограничения
+  }
+void setup_curl_for_ftps(CURL *curl, int implicit_mode)
+  {
+    /* Включаем TLS */
+    curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+
+    /* Explicit FTPS (AUTH TLS) */
+//    if(!implicit_mode)
+//      curl_easy_setopt(curl, CURLOPT_FTPSSLAUTH, CURLFTPAUTH_DEFAULT);
+//    else /* Implicit FTPS — соединение сразу TLS */
+//      curl_easy_setopt(curl, CURLOPT_FTPSSLAUTH, CURLFTPAUTH_SSL);
+    curl_easy_setopt(curl, CURLOPT_FTPSSLAUTH, (implicit_mode ? CURLFTPAUTH_SSL : CURLFTPAUTH_DEFAULT));
+
+      /* Проверка сертификатов */
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+
+    /* Если сервер использует самоподписанный сертификат:
+       curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+       curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    */
+
+    /* Пассивный режим */
+    curl_easy_setopt(curl, CURLOPT_FTP_USE_EPSV, 1L);
+
+    /* Тип передачи */
+    curl_easy_setopt(curl, CURLOPT_TRANSFERTEXT, 0L);
+
+    /* Таймауты */
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
+  }
+void setup_curl_for_sftp(CURL *curl)
+  {
+    /* SFTP работает через libssh2, SSL не используется */
+    /* Никаких FTP-настроек применять нельзя */
+
+    /* Проверка known_hosts (если нужно) */
+    /* curl_easy_setopt(curl, CURLOPT_SSH_KNOWNHOSTS, "/home/user/.ssh/known_hosts"); */
+
+    /* Ключи SSH (если используются) */
+    /*
+    curl_easy_setopt(curl, CURLOPT_SSH_PRIVATE_KEYFILE, "/path/to/id_rsa");
+    curl_easy_setopt(curl, CURLOPT_SSH_PUBLIC_KEYFILE,  "/path/to/id_rsa.pub");
+    */
+
+    /* Докачка */
+    /* Работает через CURLOPT_RESUME_FROM_LARGE */
+
+    /* Таймауты */
+    curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT, 30L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, 0L);
+  }
+int tune_curl_for_protocol(CURL *curl, int protocol_code, const CONNECTION_CONFIG *cfg, curl_off_t resume_offset, int listing)
+  {
+    char *url_with_filename = 0;
+
+    /* Общие настройки, которые нужны для всех протоколов */
+    curl_easy_setopt(curl, CURLOPT_URL, cfg->url);
+    curl_easy_setopt(curl, CURLOPT_USERNAME, (cfg->user ? cfg->user : NET_LOGIN));
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, (cfg->password ? cfg->password : NET_PASSWORD));
+
+    /* Порт задаётся вызывающим кодом */
+    if(cfg->port > 0)
+      curl_easy_setopt(curl, CURLOPT_PORT, cfg->port);
+
+    /* LIST/NLST */
+    curl_easy_setopt(curl, CURLOPT_DIRLISTONLY, (listing ? 1L : 0L));
+
+    if(!listing && cfg->filename)
+      {
+        url_with_filename = malloc(strlen(cfg->url) + strlen(cfg->filename) + 1 + 1);
+        if(!url_with_filename)
+          {
+            fprintf(stderr, "malloc() failed\n");
+            return NET_UNKNOWN_ERROR;
+          }
+        sprintf(url_with_filename, "%s%s%s", cfg->url, (*(cfg->url + strlen(cfg->url) - 1) != '/' ? "/" : ""), cfg->filename);
+      }
+    /* Докачка */
+    if(resume_offset > 0)
+      {
+        if(ftp_supports_resume(curl, url_with_filename) != NET_OK)
+          {
+            if(url_with_filename)
+              free(url_with_filename);
+            return NET_CANT_RESUME;
+          }
+        curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, resume_offset);
+      }
+
+    /* Теперь — протокольная настройка */
+    switch (protocol_code)
       {
         case PROTOCOL_FTP_CODE:
-          curl_easy_setopt(curl, CURLOPT_FTP_USE_EPSV, 0L);
+          setup_curl_for_ftp(curl);
           break;
         case PROTOCOL_FTPS_CODE:
-          curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
-          curl_easy_setopt(curl, CURLOPT_FTP_SSL_CCC, CURLFTPSSL_CCC_NONE);
-          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
-          curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+          /* Определяем implicit/explicit по порту */
+          setup_curl_for_ftps(curl, cfg->port == 990);
           break;
         case PROTOCOL_SFTP_CODE:
-          ;
+          setup_curl_for_sftp(curl);
+          break;
+        default:
+          if(url_with_filename)
+            free(url_with_filename);
+          return NET_UNKNOWN_ERROR;
       }
+
+    if(url_with_filename)
+      free(url_with_filename);
+
+    return NET_OK;
   }
 int ftp_supports_resume(CURL *curl, const char *url)
   {
@@ -232,8 +368,8 @@ int ftp_supports_resume(CURL *curl, const char *url)
     curl_easy_setopt(curl, CURLOPT_RESUME_FROM_LARGE, 0L);
 
     if(res != CURLE_OK)
-        return 0; // ошибка — считаем, что докачка не поддерживается
+      return 0; // ошибка — считаем, что докачка не поддерживается
 
     // FTP-код 350 = OK для REST
-    return (response == 350 || response == 250 || response == 213 || response == 125 || response == 150) ? NET_OK : NET_ERROR;
+    return (response == 350 || response == 250 || response == 213 || response == 125 || response == 150) ? NET_OK : NET_UNKNOWN_ERROR;
   } 
